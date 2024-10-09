@@ -29,13 +29,8 @@ app.use(
   })
 );
 
-app.use((req, res, next) => {
-  console.log(`Request Method: ${req.method}`);
-  console.log(`Request URL: ${req.url}`);
-  console.log(`Query Params:`, req.query);  // For GET requests with query parameters
-  console.log(`Request Body:`, req.body);   // For POST, PUT, DELETE requests
-  next(); // Pass control to the next middleware
-});
+
+
 app.use('/public', express.static(process.cwd() + '/public'));
 
 app.use(cors({origin: '*'})); //For FCC testing purposes only

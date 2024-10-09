@@ -159,7 +159,7 @@ test('Report a reply', function(done) {
     .send({ thread_id : thread_id[1] ,reply_id: Reply_id[1] })
     .end(function(err, res) {
       assert.equal(res.status, 200);
-      assert.equal(res.text, 'Reported');
+      assert.equal(res.text, 'reported');
       done();
     });
 });

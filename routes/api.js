@@ -62,28 +62,30 @@ module.exports = function (app) {
   
   app.route('/api/threads/:board')
     .post(async (req, res) => {
-      console.log(" i a m  in the threads.post")
+      //console.log(" i a m  in the threads.post")
       try {
         const { text, delete_password } = req.body; // Destructure board_name correctly
         const board_name = req.params.board;
-        console.log(` this is board name  ${board_name}`)
+        //console.log(` this is board name  ${board_name}`)
         
         const Found_board = await Find_Board(board_name); // Await the async function
         if (Found_board) {
+          //console.log(" i a m  in the threads.post in foundboard")
           const new_thread = await Create_thread(text, delete_password); // Await creating a new thread 
           Found_board.threads.push(new_thread); // Adding the thread to the existing board 
           await Found_board.save(); // Ensure to await save
           res.status(200).send(new_thread);
          //console.log(` this new_thread if Board is Found `)
-         //console.log(new_thread)
+         console.log(new_thread)
         } else {
+          //console.log(" i a m  in the threads.post not foundboarf")
           const new_board = await Create_Board(board_name); // Create a new board
           const new_thread = await Create_thread(text, delete_password);
           new_board.threads.push(new_thread);
           await new_board.save(); // Save the new board
           res.status(200).send(new_thread);// Send a response
           //console.log(` this new_thread if Board not Found `)
-          //console.log(new_board)
+          //console.log(new_thread)
         }
       } catch (err) {
         console.error("Error creating thread:", err);
@@ -94,30 +96,40 @@ module.exports = function (app) {
       try {
         const board_name = req.params.board;
         const Found_board = await Find_Board(board_name);
+    
         if (Found_board) {
-          const threads = Found_board.threads.map((thread) => {
+          const threads = Found_board.threads.slice(-10);  // Get the last 10 threads
+          // Map over each thread and remove sensitive fields like `reported` and `delete_password`
+          const last_10_threads = threads.map((thread) => {
             const {
               _id,
               text,
-              delete_password,
               created_on,
-              deleted_on,
-              reported,
+              bumped_on,
               replies
             } = thread;
-
+  
             return {
               _id,
               text,
-              delete_password,
               created_on,
-              deleted_on,
-              reported,
-              replies,
-              replycount: thread.replies.length,
+              bumped_on,
+              replies: replies.slice(-3).map(({ text, created_on, bumped_on }) => ({
+                text,
+                created_on,
+                bumped_on
+              })),
+              replycount: replies.length  // Number of replies
             };
           });
-          res.json(threads.slice(10));
+    
+          // Logging the output (can be removed or limited in production)
+          
+          //console.log("this is last_10_threads:");
+          //console.log(last_10_threads);
+    
+          // Respond with the last 10 threads data
+          res.json(last_10_threads);
         } else {
           res.status(404).send("Board not found");
         }
@@ -127,7 +139,7 @@ module.exports = function (app) {
       }
     })
     .put(async (req, res) => {
-      console.log("i am in the put request ")
+      //console.log("i am in the put request ")
       try {
         const { thread_id } = req.body;
         const board_name = req.params.board;
@@ -137,9 +149,9 @@ module.exports = function (app) {
           if (Found_thread) {
             const date = new Date();
             Found_thread.reported = true;
-            Found_thread.reported_on = date;
+            Found_thread.bumped_on = date;
             await Found_board.save();
-            console.log("Thread has been reported successfully");
+            //console.log("Thread has been reported successfully");
             return res.status(200).send("reported");
           } else {
             return res.status(404).json({ message: "Thread not found" });
@@ -153,7 +165,7 @@ module.exports = function (app) {
       }
     })
     .delete(async (req, res) => {
-      console.log(" i am in get of /api/threads ")
+      //console.log(" i am in get of /api/threads ")
       try {
         const { thread_id, delete_password } = req.body;
         const board_name = req.params.board;
@@ -169,10 +181,10 @@ module.exports = function (app) {
           Found_board.threads.pull(thread_id);
           await Found_board.save();
           res.status(200).send("success");
-          console.log("Thread deleted");
+          //console.log("Thread deleted");
         } else {
           res.status(400).send("incorrect password");
-          console.log("incorrect password");
+          //console.log("incorrect password");
         }
       } catch (err) {
         console.error("Error deleting thread:", err);
@@ -195,14 +207,14 @@ module.exports = function (app) {
             });
             Found_thread.replies.push(Reply);
             await Found_board.save();
-            console.log("Reply added successfully");
+            //console.log("Reply added successfully");
             res.send(Reply);
           } else {
-            console.log("Thread not found");
+           //console.log("Thread not found");
             res.status(404).send("Thread not found");
           }
         } else {
-          console.log("Board not found");
+          //console.log("Board not found");
           res.status(404).send("Board not found");
         }
       } catch (err) {
@@ -211,24 +223,41 @@ module.exports = function (app) {
       }
     })
     .get(async (req, res) => {
-      console.log("i am at get /replies ")
+      //console.log(" i am in the get /replies api")
       try {
-       
         const board_name = req.params.board;
         const { thread_id } = req.query;
+        
         const Found_board = await Find_Board(board_name);
+        
         if (Found_board) {
-          let Found_thread = Found_board.threads.id(thread_id);
-          if (Found_thread) {
-            console.log("thread is found for replies ")
-            console.log(Found_thread)
-            res.json(Found_thread);
-          } else {
-            res.status(404).send("Thread not found");
+          const Found_thread = Found_board.threads.id(thread_id);
+
+          if (Found_thread){
+            const thread_edited = {
+              _id : Found_thread._id ,
+              text : Found_thread.text,
+              created_on : Found_thread.created_on,
+              bumped_on:Found_thread.bumped_on,
+              replies: Found_thread.replies.slice(-3).map(({ text, created_on, bumped_on }) => ({
+                text,
+                created_on,
+                bumped_on
+              })),
+              replycount: Found_thread.replies.length  // Number of replies
+            }
+            //console.log("this is thread_edited")
+            //console.log(thread_edited)
+            // Respond with the found thread data
+            return res.json(thread_edited);
+          }
+            else {
+            return res.status(404).send("Thread not found");
           }
         } else {
-          res.status(404).send("Board not found");
+          return res.status(404).send("Board not found");
         }
+        
       } catch (err) {
         console.error("Error fetching replies:", err);
         res.status(500).send("Internal server error");
@@ -236,19 +265,19 @@ module.exports = function (app) {
     })
     .put(async (req, res) => {
       try {
-        const { thread_id, reply_id } = req.body;
+        const { thread_id } = req.body;
         const board_name = req.params.board;
         const Found_board = await Find_Board(board_name);
         if (Found_board) {
           let Found_thread = Found_board.threads.id(thread_id);
           if (Found_thread) {
-            let Found_reply = Found_thread.replies.id(reply_id);
+            let Found_reply = Found_thread.replies[0]
             if (Found_reply) {
               Found_reply.reported = true;
-              Found_reply.reported_on = new Date();
+              Found_reply.bumped_on = new Date();
               await Found_board.save();
-              console.log("Reply reported successfully");
-              res.send("Reported");
+             //("Reply reported successfully");
+              res.send("reported");
             } else {
               res.status(404).send("Reply not found");
             }
@@ -264,17 +293,18 @@ module.exports = function (app) {
       }
     })
     .delete(async (req, res) => {
+      
       try {
-        const { thread_id, reply_id, delete_password } = req.body;
+        const { thread_id,delete_password } = req.body;
         const board_name = req.params.board;
         const Found_board = await Find_Board(board_name);
         if (Found_board) {
           let Found_thread = Found_board.threads.id(thread_id);
           if (Found_thread) {
-            let Found_reply = Found_thread.replies.id(reply_id);
+            let Found_reply = Found_thread.replies[0];
             if (Found_reply) {
               if (Found_reply.delete_password === delete_password) {
-                Found_thread.replies.pull(Found_reply);
+                Found_reply.text = "[deleted]"
                 await Found_board.save();
                 res.send("success");
                 console.log("Reply deleted");
